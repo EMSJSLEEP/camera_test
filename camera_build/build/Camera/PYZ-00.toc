@@ -1,0 +1,2 @@
+('C:\\Users\\10417\\Desktop\\windows_camera\\camera_build\\build\\Camera\\PYZ-00.pyz',
+ [])
