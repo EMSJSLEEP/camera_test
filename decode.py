@@ -2,6 +2,7 @@
 import time
 import cv2
 import os
+import math
 import numpy as np
 from pylibdmtx import pylibdmtx
 
@@ -29,9 +30,7 @@ class Decode(object):
             max_ratio = 2
         else:
             max_ratio = 1
-        # print(max_ratio)
         start_time = time.time()
-        gray_image = cv2.cvtColor(_image, cv2.COLOR_BGR2GRAY)
         denoised_image = cv2.fastNlMeansDenoising(_image, None)
         preprocess_time_ms = (time.time() - start_time) * 1000
         print(f"Preprocess time: {preprocess_time_ms:.2f} ms")
@@ -46,7 +45,7 @@ class Decode(object):
             resized_image = cv2.resize(denoised_image, 
                                        (int(width * (i + 1)), int(height * (i + 1))),
                                        interpolation=cv2.INTER_LINEAR)
-            self.save_picture(resized_image, i)
+            #self.save_picture(resized_image, i)
             decoded_data = self.simple_decode_dmtx(resized_image, piece_time * (i + 1) * (i + 1))
             if decoded_data:
                 return decoded_data
@@ -65,7 +64,7 @@ class Decode(object):
         else:
             return decoded_info
     
-    def decode_dot(self, _image, timeout_ms):
+    def decode_dot(self, _image, kernel_size, timeout_ms=3000):
         start_time = time.time()
 
         # #创建一个保存图像的目录
@@ -77,27 +76,53 @@ class Decode(object):
             path = os.path.join(output_dir, f"step_{step}.jpg")
             cv2.imwrite(path, img)
             print(f"Saved: {path}")
-
+        
         # 开操作去除细丝以及杂点
         kernel = np.ones((3, 3), np.uint8)
         open_image_2 = cv2.morphologyEx(_image, cv2.MORPH_OPEN, kernel, iterations=1)
-        save_image("7_open", open_image_2)
+        #save_image("7_open", open_image_2)
 
-        # # 闭操作填充二维码空隙
-        kernel2 = np.ones((3, 3), np.uint8)
+        # 闭操作填充二维码空隙
+        kernel2 = np.ones((kernel_size, kernel_size), np.uint8)
         close_image_2 = cv2.morphologyEx(open_image_2, cv2.MORPH_CLOSE, kernel2, iterations=1)
-        save_image("8_close", close_image_2)
+        #save_image("8_close", close_image_2)
     
         gaussian_blur_image = cv2.GaussianBlur(close_image_2, (3, 3), 1)
-        save_image("10_gaussian_blur", gaussian_blur_image)
+        #save_image("9_gaussian_blur", gaussian_blur_image)
 
-        dst_image = cv2.resize(gaussian_blur_image, (200, 200))
-        save_image("11_resized", dst_image)
+        flag = self.simple_decode_dmtx(gaussian_blur_image, timeout_ms)
 
-        flag = self.simple_decode_dmtx(dst_image, timeout_ms)
-        elapsed_time = (time.time() - start_time) * 1000  # 转为毫秒
+        if flag == None:
+            if kernel_size == 7:
+                kernel_size = 5
+                kernel = np.ones((3, 3), np.uint8)
+                open_image_2 = cv2.morphologyEx(_image, cv2.MORPH_OPEN, kernel, iterations=2)
+            elif kernel_size == 3:
+                kernel_size = 5
+            #save_image("10_open", open_image_2)
+            kernel2 = np.ones((kernel_size, kernel_size), np.uint8)
+            close_image_2 = cv2.morphologyEx(open_image_2, cv2.MORPH_CLOSE, kernel2, iterations=1)
+            #save_image("12_close", close_image_2)
+        
+            gaussian_blur_image = cv2.GaussianBlur(close_image_2, (3, 3), 1)
+            #save_image("13_gaussian_blur", gaussian_blur_image)
+
+            flag = self.simple_decode_dmtx(gaussian_blur_image, timeout_ms)
+        elapsed_time = (time.time() - start_time) * 1000 
         print(f"Cost {elapsed_time:.2f}ms for processing image")
         return flag
+
+    def auto_decode(self, _image, timeout_ms=3000):
+        decode_result = None
+        src_image = cv2.fastNlMeansDenoising(_image, None)
+        normalized_image = self.is_normalize_deal(src_image)
+        kernel_size, deal_image = self.hough_circle_detection(normalized_image)
+        print("kernel size is ", kernel_size)
+        if kernel_size == 0:
+            decode_result = self.decode_ecc200(deal_image, timeout_ms)
+        else:
+            decode_result = self.decode_dot(deal_image, kernel_size, timeout_ms)
+        return decode_result
 
     def save_picture(self, img, step):
         # #创建一个保存图像的目录
@@ -108,6 +133,8 @@ class Decode(object):
         print(f"Saved: {path}")
 
     def Mean_Filtering(self, img):
+        # 均值滤波以减少噪声
+        # gray_image = cv2.blur(src_image, (9,9))
         #特点：通过计算局部区域的像素均值，平滑图像并减少噪声。
         #适用场景：用于去除高频噪声（如随机噪声）并使图像更加平滑。
         kernel = np.ones((3, 3), np.float32) / 9
@@ -144,38 +171,95 @@ class Decode(object):
         #特点：用于强调图像边缘，便于后续处理。
         #适用场景：提取二值化后的边缘信息。
         edges = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=3)
-        edges = cv2.Canny(image, 50, 150)
+        edges = cv2.Canny(img, 50, 150)
+
+    def dynamic_kernel_morphology(self, normalized_image):
+        # 检测轮廓
+        contours, _ = cv2.findContours(normalized_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_image = cv2.cvtColor(binary_image, cv2.COLOR_GRAY2BGR)
+        filtered_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > 50]
+        cv2.drawContours(contours_image, filtered_contours, -1, (0, 255, 0), 2)
+
+        # 计算点的宽度
+        sizes = [cv2.boundingRect(cnt)[2] for cnt in contours if cv2.contourArea(cnt) > 5]
+        print(sizes)
+        # 动态核大小
+        average_size = int(np.mean(sizes)) if sizes else 3
+        kernel_size = min(3, average_size)  # 核的最小大小为3
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        # 形态学开运算
+        open_image_2 = cv2.morphologyEx(normalized_image, cv2.MORPH_OPEN, kernel, iterations=1)
+        close_image_2 = cv2.morphologyEx(open_image_2, cv2.MORPH_CLOSE, kernel, iterations=1)
+        cv2.imshow("Contours", contours_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        return close_image_2
+
+    def hough_circle_detection(self, _image):
+        resize_image = cv2.resize(_image, (200, 200))
+        circles = cv2.HoughCircles(
+            resize_image,
+            cv2.HOUGH_GRADIENT,
+            dp=1,
+            minDist=18,       # 设置最小圆心距离
+            param1=10,        # Canny 边缘检测的高阈值
+            param2=12,        # 圆心检测的阈值
+            minRadius=1,     # 最小半径
+            maxRadius=6     # 最大半径normalized_image
+        )
+        total_area = 0
+        circle_count = 0
+        kernel_calculation = 0
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            for i in circles[0, :]:
+                x, y, r = i[0], i[1], i[2]
+                area = math.pi * (r ** 2)
+                total_area += area
+                circle_count += 1
+                # cv2.circle(normalize_image, (x, y), r, (0, 255, 0), 2)
+                # cv2.circle(normalize_image, (x, y), 2, (0, 0, 255), 3)
+            print(f"There find {circle_count} circles")
+
+            if circle_count >= 12:
+                average_area = total_area / circle_count
+                print(average_area)
+                kernel_calculation = self.map_to_odd_range(average_area)
+            return kernel_calculation, resize_image
+        else:
+            return 0, _image
+        
+
+    def is_normalize_deal(self, _image):
+        avg_brightness = np.mean(_image)
+        print(f"avg brightness is {avg_brightness}")
+        if avg_brightness <= 90:
+            normalize_image = cv2.normalize(_image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+            return normalize_image
+        else:
+            return _image
+
+    def map_to_odd_range(self, value):
+        sqrt_value = math.sqrt(value)
+
+        odd_numbers = [3, 5, 7]
+    
+        closest_odd = min(odd_numbers, key=lambda x: abs(x - sqrt_value))
+        
+        return closest_odd
+        
+
 
 
 if __name__ == "__main__":
     x = Decode()
-    image_path = "./10.png"
-    src_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    src_image = cv2.resize(src_image, (150, 150))
-    x.save_picture(src_image, "1")
-    src_image = cv2.fastNlMeansDenoising(src_image, None)
-    x.save_picture(src_image, "2")
-    normalized_image = cv2.normalize(src_image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-    x.save_picture(normalized_image, "3")
-
-    # width, height = src_image.shape[1], src_image.shape[0]
-    # src_image = cv2.flip(src_image, 0)
-    # src_image = cv2.resize(src_image, (100, 100))
-    kernel = np.ones((3, 3), np.uint8)
-    open_image_2 = cv2.morphologyEx(normalized_image, cv2.MORPH_OPEN, kernel, iterations=1)
-    x.save_picture(open_image_2, "open")
-    # kernel2 = np.ones((3, 3), np.uint8)
-    # src_image = x.Gaussian_Blur(src_image)
-    # src_image = x.Bilateral_Filtering(src_image)
-    # x.save_picture(src_image, "step_resize")
-
-    #黑白二值化
-    # src_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    # _, binary_image = cv2.threshold(src_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    if src_image is None:
-        print("Failed to load image. Check the file path.")
-    else:
-        # result = x.decode_ecc200(src_image, timeout_ms=6000)
-        result = x.simple_decode_dmtx(open_image_2, timeout_ms=6000)
-        # result = x.decode_dot(src_image, timeout_ms=6000)
-        print(result)
+    for i in range(1, 12):
+        image_path = f"dot{i}.png"
+        print(image_path + "\n")
+        img= cv2.imread(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if image_path == "dot1.png":
+            mirror_img = cv2.flip(img, 1)
+            print(x.auto_decode(mirror_img, 8000))
+        else:
+            print(x.auto_decode(img, 8000))

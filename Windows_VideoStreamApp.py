@@ -229,14 +229,17 @@ class Windows_VideoStreamApp(QtWidgets.QMainWindow):
                             crop_coordinates[2]]
         decode_type = self.ui.decode_type_box.currentText()
         self.log_online(f"now decode type is {decode_type}\n")
+        gray_image = cv2.cvtColor(_frame, cv2.COLOR_BGR2GRAY)
         if decode_type == 'ECC200':
-            decoded_info = self.decode_tool.decode_ecc200(_frame)
+            decoded_info = self.decode_tool.decode_ecc200(gray_image)
         elif decode_type == 'DOT_ECC200':
-            decoded_info = self.decode_tool.decode_dot(_frame, 3000)
+            decoded_info = self.decode_tool.decode_dot(gray_image, 3000)
         elif decode_type == 'QR':
-            decoded_info = self.decode_tool.decode_qr(_frame)
+            decoded_info = self.decode_tool.decode_qr(gray_image)
+        elif decode_type == 'AUTO':
+            decoded_info = self.decode_tool.auto_decode(gray_image, 4000)
         else:
-            decoded_info = self.decode_tool.simple_decode_dmtx(_frame, 3000)
+            decoded_info = self.decode_tool.simple_decode_dmtx(gray_image, 3000)
         self.change_region_para()
         return decoded_info
 

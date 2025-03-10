@@ -2,7 +2,7 @@ from PyQt5 import QtCore, QtWidgets
 from mouse_paint import MousePaint
 
 format_size = ["640 * 480", "1280 * 720", "1920 * 1080", "3840 * 2160"]
-decode_type = ["ENLARGE_ECC200", "DOT_ECC200", "QR", "NORMAL_ECC200"]
+decode_type = ["AUTO", "ENLARGE_ECC200", "DOT_ECC200", "QR", "NORMAL_ECC200"]
 camera_list = ['CAMERA0', 'CAMERA1', 'CAMERA2', 'CAMERA3', 'CAMERA4', 'CAMERA5']
 
 class Ui_capture(object):
