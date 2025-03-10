@@ -1,1 +1,0 @@
-('D:\\TMP\\windows_camera\\camera_build\\build\\Camera v1\\PYZ-00.pyz', [])

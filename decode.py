@@ -6,7 +6,6 @@ import math
 import numpy as np
 from pylibdmtx import pylibdmtx
 
-
 class Decode(object):
     def __init__(self, path='image.jpg'):
         self.path = path

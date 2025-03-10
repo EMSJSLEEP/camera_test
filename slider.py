@@ -38,7 +38,7 @@ class SettingsWindow(QWidget):
         self.led_pwm_input = QLineEdit()
 
         # Set validators to ensure only positive integers are allowed
-        validator = QIntValidator(-20, 3000, self)
+        validator = QIntValidator(-100, 3000, self)
         self.exposure_input.setValidator(validator)
         self.focus_input.setValidator(validator)
         self.led_pwm_input.setValidator(validator)

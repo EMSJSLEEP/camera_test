@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/cwu/Desktop/nova/tcp",
+      "program": "/Users/cwu/Desktop/nova/tcp/build/Debug/outDebug"
+    }
+  ]
+}
