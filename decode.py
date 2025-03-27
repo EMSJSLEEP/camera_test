@@ -5,6 +5,7 @@ import os
 import math
 import numpy as np
 from pylibdmtx import pylibdmtx
+from pyzbar import pyzbar
 
 
 class Decode(object):
@@ -19,7 +20,28 @@ class Decode(object):
             return all_barcode_info[0].data.decode("utf-8")
         else:
             return 'decode_fail'
-    
+
+    def decode_shape_code(self, _image, timeout_ms=1000):
+        # _image = cv2.imread("/Users/cwu/Desktop/1.png")
+        # gray = cv2.cvtColor(_image, cv2.COLOR_BGR2GRAY)
+        src_image = cv2.fastNlMeansDenoising(_image, None)
+        start_time = time.time()
+        results = ["decode fail"]
+        try:
+            while (time.time() - start_time) * 1000 < timeout_ms:
+                barcodes = pyzbar.decode(src_image)
+                if barcodes:
+                    for barcode in barcodes:
+                        results.append({
+                            "type": barcode.type,
+                            "data": barcode.data.decode("utf-8")
+                        })
+                    break
+        except Exception as e:
+            print(f"条形码解码失败: {e}")
+
+        return results
+
     def decode_ecc200(self, _image, timeout_ms=3000):
         height, width = _image.shape[:2]
         if height < 80:
@@ -253,13 +275,14 @@ class Decode(object):
 
 if __name__ == "__main__":
     x = Decode()
-    for i in range(1, 12):
-        image_path = f"dot{i}.png"
-        print(image_path + "\n")
-        img= cv2.imread(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        if image_path == "dot1.png":
-            mirror_img = cv2.flip(img, 1)
-            print(x.auto_decode(mirror_img, 8000))
-        else:
-            print(x.auto_decode(img, 8000))
+    # for i in range(1, 12):
+    #     image_path = f"dot{i}.png"
+    #     print(image_path + "\n")
+    #     img= cv2.imread(image_path)
+    #     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #     if image_path == "dot1.png":
+    #         mirror_img = cv2.flip(img, 1)
+    #         print(x.auto_decode(mirror_img, 8000))
+    #     else:
+    #         print(x.auto_decode(img, 8000))
+    print(x.decode_shape_code(1,1000))

@@ -273,6 +273,8 @@ class PC_VideoStreamApp(QtWidgets.QMainWindow):
             decoded_info = self.decode_tool.decode_qr(gray_image)
         elif decode_type == 'AUTO':
             decoded_info = self.decode_tool.auto_decode(gray_image, 4000)
+        elif decode_type == 'SHAPE_CODE':
+            decoded_info = self.decode_tool.decode_shape_code(gray_image)
         else:
             decoded_info = self.decode_tool.simple_decode_dmtx(gray_image, 3000)
         self.change_region_para()
