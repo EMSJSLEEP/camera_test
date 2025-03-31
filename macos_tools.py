@@ -143,10 +143,26 @@ class Tools(object):
             return True
         except ValueError:
             return False  
+    
+    def get_camera_uuid_for_opencv(self):
+        """
+        获取 macOS 摄像头的 UUID，并存入字典，按照 system_profiler 输出顺序存储。
+        返回:
+            camera_dict (dict): {索引: UUID}
+        """
+        try:
+            result = subprocess.run(["system_profiler", "SPCameraDataType"], capture_output=True, text=True)
+            output = result.stdout
+            uuid_pattern = re.findall(r"Unique ID:\s+(\S+)", output)
+            camera_dict = {i: uuid for i, uuid in enumerate(uuid_pattern)}
+            return camera_dict
+        except Exception as e:
+            print(f"获取摄像头 UUID 失败: {e}")
+            return {}
 
 if __name__ == '__main__':
     x = Tools()
     # print(x.get_devices())
-    print(x.get_camera_id())
+    print(x.get_camera_uuid_for_opencv())
     # print(x.get_mac_cameras())
     # print(x.get_camera_uuid_and_name())

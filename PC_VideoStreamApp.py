@@ -125,6 +125,7 @@ class PC_VideoStreamApp(QtWidgets.QMainWindow):
         self.mac_camera_index = None
         self.ui.comboBox.clear()
         self.log_online("Search camera devices......\nCamera list:\n  ")
+        self.opencv_sort_dict = self.tool_no_para.get_camera_uuid_for_opencv()
         self.video_dict = self.tool_no_para.get_camera_id()
         self.video_len = len(self.video_dict)
         for index, (key, item) in enumerate(self.video_dict.items()):
@@ -148,8 +149,18 @@ class PC_VideoStreamApp(QtWidgets.QMainWindow):
                 self.log_online(f"Match camera{select_position_id} successful\n")
                 return value['index']
         self.log_online(f"Error match camera{select_position_id}\n")
+    
+    def sort_for_opencv(self, _num):
+        print(self.opencv_sort_dict)
+        key_found = next(key for key, value in camera_list.items() if value == _num)
+        select_position_id = self.video_dict[key_found]['position_id']
+        print(select_position_id)
+        opencv_num = next(key for key, value in self.opencv_sort_dict.items() if value == select_position_id)
+        return int(opencv_num)
 
     def tools_init(self, num):
+        self.opencv_num = self.sort_for_opencv(num)
+        print(f"select opencv is {self.opencv_num}")
         if self.video_len == 1 or num == self.mac_camera_index:
             self.ex_value_limit = [False, False]
             self.fo_value_limit = [False, False]
@@ -174,10 +185,11 @@ class PC_VideoStreamApp(QtWidgets.QMainWindow):
         self.params_set()
         camera_num = camera_list[self.ui.comboBox.currentText()]
         self.log_online("Now connect Camera{}\n".format(camera_num))
+        self.opencv_sort_dict = self.tool_no_para.get_camera_uuid_for_opencv()
         self.tools_init(camera_num)
         self.w, self.h = self.get_frame_size()
         try:
-            self.camera = cv2.VideoCapture(camera_num)
+            self.camera = cv2.VideoCapture(self.opencv_num)
             self.camera.set(6, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
             self.camera.set(5, 30)  # 帧率
             self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.w)
